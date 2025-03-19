@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense, useContext } from 'react';
 import {
   Box,
   Typography,
@@ -6,14 +6,14 @@ import {
   Paper,
   CircularProgress
 } from '@mui/material'; 
-import { theme } from '../theme';
-import aiService from '../utils/aiService';
+import { ThemeContext } from './index';
+import aiService from './utils/aiService';
 
 // Lazy load subcomponents
-const ProductFilters = lazy(() => import('./eyewear/ProductFilters'));
-const ProductGrid = lazy(() => import('./eyewear/ProductGrid'));
-const ProductRecommendations = lazy(() => import('./eyewear/ProductRecommendations'));
-const FaceShapeInfo = lazy(() => import('./eyewear/FaceShapeInfo'));
+const ProductFilters = lazy(() => import('./components/eyewear/ProductFilters'));
+const ProductGrid = lazy(() => import('./components/eyewear/ProductGrid'));
+const ProductRecommendations = lazy(() => import('./components/eyewear/ProductRecommendations'));
+const FaceShapeInfo = lazy(() => import('./components/eyewear/FaceShapeInfo'));
 
 // Loading component for suspended components
 const ComponentLoader = () => (
@@ -21,20 +21,20 @@ const ComponentLoader = () => (
     display: 'flex', 
     justifyContent: 'center', 
     alignItems: 'center', 
-    py: theme.spacing.xl 
+    py: 3
   }}>
-    <CircularProgress size={30} sx={{ color: theme.colors.primary }} />
-    <Typography variant="body2" sx={{ ml: theme.spacing.md }}>
+    <CircularProgress size={30} color="primary" />
+    <Typography variant="body2" sx={{ ml: 2 }}>
       Loading component...
     </Typography>
   </Box>
 );
 
 const EyewearStyler = ({ aiMeasurements }) => {
+  const { themeMode } = useContext(ThemeContext);
   const [products, setProducts] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
   const [filters, setFilters] = useState({
     brand: '',
     frameShape: '',
@@ -46,8 +46,8 @@ const EyewearStyler = ({ aiMeasurements }) => {
     faceShape: aiMeasurements?.faceShape || '',
   });
 
-  // Get theme colors based on dark mode
-  const colors = theme.getModeColors(darkMode);
+  // Determine if dark mode is active
+  const darkMode = themeMode === 'dark';
 
   // Fetch products from API
   useEffect(() => {
@@ -81,7 +81,7 @@ const EyewearStyler = ({ aiMeasurements }) => {
       try {
         setLoading(true);
         
-        // Use the AI service to get recommendations instead of local TensorFlow
+        // Use the AI service to get recommendations
         const recommendationData = await aiService.getEyewearRecommendations(aiMeasurements);
         
         // Fetch the recommended products
@@ -113,27 +113,22 @@ const EyewearStyler = ({ aiMeasurements }) => {
     setFilters({ ...filters, ...newFilters });
   };
 
-  // Toggle dark mode
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-  };
-
   return (
     <Box sx={{ 
       maxWidth: '1280px', 
       margin: '0 auto', 
-      p: theme.spacing.md,
-      backgroundColor: colors.background,
-      color: colors.text,
-      borderRadius: theme.borderRadius.lg,
-      transition: theme.transitions.default
+      p: 2,
+      backgroundColor: darkMode ? '#121212' : '#f8f9fa',
+      color: darkMode ? '#ffffff' : '#212121',
+      borderRadius: 2,
+      transition: 'all 0.3s ease'
     }}>
       <Typography 
         variant="h4" 
         sx={{ 
-          mb: theme.spacing.lg, 
+          mb: 3, 
           textAlign: 'center',
-          fontWeight: theme.typography.fontWeights.semiBold
+          fontWeight: 600
         }}
       >
         Virtual Eyewear Styler
@@ -147,7 +142,6 @@ const EyewearStyler = ({ aiMeasurements }) => {
               filters={filters} 
               onChange={handleFilterChange} 
               darkMode={darkMode}
-              toggleDarkMode={toggleDarkMode}
             />
           </Suspense>
         </Grid>
@@ -157,12 +151,14 @@ const EyewearStyler = ({ aiMeasurements }) => {
           <Paper 
             elevation={darkMode ? 2 : 1} 
             sx={{ 
-              p: theme.spacing.md, 
-              backgroundColor: colors.card,
-              color: colors.text,
-              borderRadius: theme.borderRadius.md,
-              mb: theme.spacing.lg,
-              boxShadow: theme.getBoxShadow(darkMode)
+              p: 3, 
+              backgroundColor: darkMode ? '#1e1e1e' : '#ffffff',
+              color: darkMode ? '#ffffff' : '#212121',
+              borderRadius: 1,
+              mb: 3,
+              boxShadow: darkMode 
+                ? '0 4px 12px rgba(0, 0, 0, 0.5)' 
+                : '0 2px 8px rgba(0, 0, 0, 0.1)'
             }}
           >
             {/* Face Shape Information */}

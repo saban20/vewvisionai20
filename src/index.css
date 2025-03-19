@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Orbitron', 'Inter', sans-serif;
+    background: linear-gradient(135deg, #0F1419 0%, #1A2526 100%);
+    color: #D9D9D9;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+  }
+
+  [data-theme='light'] {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  [data-theme='dark'] {
+    background: #1a1a1a;
+    color: #ffffff;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-[#1A2526] rounded-lg border border-[#2A3439] p-6 transition-all duration-300 hover:border-[#00D8FF] hover:shadow-[0_0_15px_rgba(0,216,255,0.3)];
+  }
+  .btn-primary {
+    @apply bg-gradient-to-r from-[#00D8FF] to-[#00A4C8] text-[#0F1419] px-6 py-3 rounded-lg font-semibold hover:from-[#00A4C8] hover:to-[#007B94] transition-all duration-200 shadow-md;
+  }
+  .btn-secondary {
+    @apply bg-gradient-to-r from-[#FF4F5A] to-[#D93A44] text-white px-6 py-3 rounded-lg font-semibold hover:from-[#D93A44] hover:to-[#B3252F] transition-all duration-200 shadow-md;
+  }
+  .btn-danger {
+    @apply bg-[#2A3439] text-[#FF4F5A] px-6 py-3 rounded-lg font-semibold hover:bg-[#FF4F5A] hover:text-[#0F1419] transition-all duration-200 shadow-md;
+  }
+  .input {
+    @apply w-full p-3 bg-[#2A3439] border border-[#3C4A50] rounded-lg text-[#D9D9D9] focus:outline-none focus:ring-2 focus:ring-[#00D8FF] transition-all duration-200 placeholder-[#6B7A80];
+  }
+  .hologram {
+    filter: drop-shadow(0 0 10px rgba(0, 255, 255, 0.8));
+    animation: flicker 1.5s infinite alternate;
+  }
+  .hologram-button {
+    background: linear-gradient(45deg, rgba(0, 255, 255, 0.2), rgba(0, 128, 255, 0.2));
+    border: 1px solid rgba(0, 255, 255, 0.5);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.5), 0 0 20px rgba(0, 255, 255, 0.3);
+    color: #fff;
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.8);
+    transition: all 0.3s ease;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: 500;
+    animation: hologram-flicker 2s infinite alternate;
+  }
+  .hologram-button:hover {
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.8), 0 0 30px rgba(0, 255, 255, 0.5);
+    transform: translateY(-2px);
+  }
+  .hologram-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    box-shadow: 0 4px 15px rgba(0, 255, 255, 0.2);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    padding: 20px;
+    border-radius: 12px;
+    animation: hologram-flicker 2s infinite alternate;
+  }
+  .hologram-image {
+    animation: float 4s ease-in-out infinite;
+  }
+  .info-box {
+    @apply bg-[#1A2526] border border-[#00D8FF] p-4 rounded-lg hologram text-left;
+  }
+  .section-title {
+    @apply text-2xl font-semibold mb-4 hologram;
+  }
+}
+
+@keyframes flicker {
+  0% { opacity: 0.8; }
+  100% { opacity: 1; }
+}
+
+@keyframes hologram-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+@keyframes float {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+  100% { transform: translateY(0); }
+}
+
+/* Load futuristic font */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+/* Reset and base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Transitions */
+.fade-enter {
+  opacity: 0;
+}
+.fade-enter-active {
+  opacity: 1;
+  transition: opacity 300ms;
+}
+.fade-exit {
+  opacity: 1;
+}
+.fade-exit-active {
+  opacity: 0;
+  transition: opacity 300ms;
+}
+
+/* Utility classes */
+.text-center {
+  text-align: center;
+}
+
+.mb-1 {
+  margin-bottom: 0.5rem;
+}
+
+.mb-2 {
+  margin-bottom: 1rem;
+}
+
+.mb-3 {
+  margin-bottom: 1.5rem;
+}
+
+.mt-1 {
+  margin-top: 0.5rem;
+}
+
+.mt-2 {
+  margin-top: 1rem;
+}
+
+.mt-3 {
+  margin-top: 1.5rem;
+}
+
+/* Image container for aspect ratio */
+.img-container {
+  position: relative;
+  width: 100%;
+  padding-top: 100%; /* 1:1 Aspect Ratio */
+  overflow: hidden;
+}
+
+.img-container img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+} 

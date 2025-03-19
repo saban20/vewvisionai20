@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NewVisionAI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Debug output container -->
+    <style>
+      #debug {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0,0,0,0.8);
+        color: #00ff00;
+        font-family: monospace;
+        padding: 10px;
+        max-height: 200px;
+        overflow: auto;
+        z-index: 9999;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"><!-- React will mount here --></div>
+    <div id="debug"></div>
+    
+    <script>
+      // Debugging helper
+      const debugEl = document.getElementById('debug');
+      console.originalLog = console.log;
+      console.log = function() {
+        console.originalLog.apply(console, arguments);
+        const args = Array.from(arguments).join(' ');
+        debugEl.innerHTML += `<div>${args}</div>`;
+        debugEl.scrollTop = debugEl.scrollHeight;
+      }
+      
+      // Show debug panel on error
+      window.addEventListener('error', function(e) {
+        debugEl.style.display = 'block';
+        console.log('ERROR:', e.message, 'at', e.filename, 'line', e.lineno);
+        return false;
+      });
+      
+      // Show ready state
+      document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM fully loaded');
+      });
+    </script>
+    
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html> 

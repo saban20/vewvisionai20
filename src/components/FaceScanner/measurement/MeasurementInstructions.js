@@ -1,69 +1,60 @@
 import React from 'react';
 import { Box, Typography, Paper, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
-import LightbulbIcon from '@mui/icons-material/Lightbulb';
-import FaceIcon from '@mui/icons-material/Face';
-import AdjustIcon from '@mui/icons-material/Adjust';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import { theme } from '../../../theme';
 
+/**
+ * Component displaying instructions for the facial measurement process
+ */
 const MeasurementInstructions = ({ darkMode }) => {
+  // Get theme colors based on dark mode
+  const colors = theme.getModeColors(darkMode);
+  
+  const instructions = [
+    'Position your face in the center of the frame',
+    'Remove glasses, hats, or anything covering your face',
+    'Ensure good lighting conditions',
+    'Keep a neutral expression',
+    'Look straight ahead at the camera',
+    'Follow the on-screen instructions during measurement'
+  ];
+  
   return (
-    <Paper 
-      elevation={darkMode ? 2 : 0} 
-      sx={{ 
-        p: 3, 
-        borderRadius: '12px',
-        backgroundColor: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-        color: darkMode ? '#f5f5f7' : 'inherit',
-        mb: 3
+    <Paper
+      elevation={darkMode ? 2 : 1}
+      sx={{
+        p: theme.spacing.md,
+        backgroundColor: colors.card,
+        color: colors.text,
+        borderRadius: theme.borderRadius.md,
+        mb: theme.spacing.lg
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <LightbulbIcon sx={{ color: '#0071e3', mr: 1 }} />
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Tips for Accurate Measurements
-        </Typography>
+      <Typography variant="h6" sx={{ mb: theme.spacing.md, fontWeight: theme.typography.fontWeights.medium }}>
+        How to Get Perfect Measurements
+      </Typography>
+      
+      <Box sx={{ mb: theme.spacing.md }}>
+        <List dense disablePadding>
+          {instructions.map((instruction, index) => (
+            <ListItem key={index} disableGutters sx={{ mb: theme.spacing.xs }}>
+              <ListItemIcon sx={{ minWidth: '30px', color: theme.colors.primary }}>
+                <CheckCircleOutlineIcon />
+              </ListItemIcon>
+              <ListItemText 
+                primary={instruction}
+                primaryTypographyProps={{ 
+                  fontSize: theme.typography.fontSizes.sm,
+                  color: colors.text
+                }}
+              />
+            </ListItem>
+          ))}
+        </List>
       </Box>
-
-      <List sx={{ py: 0 }}>
-        <ListItem sx={{ py: 1 }}>
-          <ListItemIcon>
-            <FaceIcon sx={{ color: darkMode ? '#a1a1a6' : '#86868b' }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Position your face" 
-            secondary="Ensure your entire face is visible and centered in the camera frame"
-            primaryTypographyProps={{ fontWeight: 500 }}
-            secondaryTypographyProps={{ color: darkMode ? '#a1a1a6' : '#86868b' }}
-          />
-        </ListItem>
-
-        <ListItem sx={{ py: 1 }}>
-          <ListItemIcon>
-            <AdjustIcon sx={{ color: darkMode ? '#a1a1a6' : '#86868b' }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Good lighting" 
-            secondary="Make sure your face is well lit with even lighting and no harsh shadows"
-            primaryTypographyProps={{ fontWeight: 500 }}
-            secondaryTypographyProps={{ color: darkMode ? '#a1a1a6' : '#86868b' }}
-          />
-        </ListItem>
-
-        <ListItem sx={{ py: 1 }}>
-          <ListItemIcon>
-            <CheckCircleOutlineIcon sx={{ color: darkMode ? '#a1a1a6' : '#86868b' }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Remove glasses" 
-            secondary="Take off any eyewear for the most accurate measurements"
-            primaryTypographyProps={{ fontWeight: 500 }}
-            secondaryTypographyProps={{ color: darkMode ? '#a1a1a6' : '#86868b' }}
-          />
-        </ListItem>
-      </List>
-
-      <Typography variant="body2" sx={{ mt: 2, fontStyle: 'italic', color: darkMode ? '#a1a1a6' : '#86868b' }}>
-        The system will guide you through each step. Just follow the instructions on screen.
+      
+      <Typography variant="body2" sx={{ color: colors.textSecondary, fontStyle: 'italic' }}>
+        For best results, follow these guidelines to ensure accurate measurements for your eyewear recommendations.
       </Typography>
     </Paper>
   );
