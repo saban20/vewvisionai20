@@ -1,0 +1,182 @@
+/* Cosmic Theme - App.css */
+
+/* Base styles */
+body {
+  margin: 0;
+  font-family: 'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #111130;
+  color: #ffffff;
+  overflow-x: hidden;
+}
+
+.App {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Cosmic background */
+.cosmic-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #0e0e23 0%, #1a1a40 100%);
+  z-index: -1;
+  overflow: hidden;
+}
+
+.cosmic-bg::before,
+.cosmic-bg::after {
+  content: '';
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.15;
+  animation: float 15s infinite ease-in-out;
+}
+
+.cosmic-bg::before {
+  background: #FF1493;
+  top: 10%;
+  left: 20%;
+  animation-delay: 0s;
+}
+
+.cosmic-bg::after {
+  background: #6E56CF;
+  bottom: 10%;
+  right: 20%;
+  animation-delay: -5s;
+}
+
+/* Small stars */
+.cosmic-bg::before {
+  box-shadow: 
+    20vw 10vh 0 0 rgba(255, 255, 255, 0.1),
+    30vw 40vh 0 0 rgba(255, 255, 255, 0.05),
+    80vw 30vh 0 0 rgba(255, 255, 255, 0.08),
+    65vw 70vh 0 0 rgba(255, 255, 255, 0.07),
+    45vw 90vh 0 0 rgba(255, 255, 255, 0.06),
+    75vw 80vh 0 0 rgba(255, 255, 255, 0.09);
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-30px) scale(1.1);
+  }
+}
+
+/* Glass card style */
+.glass-card {
+  background: rgba(18, 18, 38, 0.7);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(110, 86, 207, 0.3);
+  padding: 20px;
+  margin-bottom: 20px;
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  box-shadow: 0 8px 40px rgba(110, 86, 207, 0.3);
+  transform: translateY(-5px);
+}
+
+/* Nebula button */
+.nebula-button {
+  background: linear-gradient(45deg, #6E56CF 30%, #FF1493 90%);
+  border: 0;
+  border-radius: 8px;
+  color: white;
+  padding: 10px 20px;
+  box-shadow: 0 0 15px rgba(110, 86, 207, 0.5);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 5px;
+}
+
+.nebula-button:hover {
+  box-shadow: 0 0 20px rgba(255, 20, 147, 0.7);
+  transform: translateY(-2px);
+}
+
+.nebula-button:disabled {
+  background: linear-gradient(45deg, #4a3e7a 30%, #a0517a 90%);
+  opacity: 0.7;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Navigation panel */
+.navigation {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .navigation {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .nebula-button {
+    width: 100%;
+    max-width: 250px;
+  }
+}
+
+/* Skip to content for accessibility */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #FF1493;
+  color: white;
+  padding: 8px;
+  z-index: 100;
+  transition: top 0.3s;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Utility classes */
+.text-glow {
+  text-shadow: 0 0 10px rgba(110, 86, 207, 0.5);
+}
+
+.pink-glow {
+  text-shadow: 0 0 10px rgba(255, 20, 147, 0.7);
+}
+
+/* Animation keyframes */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+} 

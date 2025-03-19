@@ -1,0 +1,250 @@
+@import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=SF+Pro+Text:wght@400;500&display=swap');
+
+body {
+  margin: 0;
+  font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: #ffffff;
+  color: #1d1d1f;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden; /* Only hide horizontal overflow */
+  overflow-y: auto; /* Allow vertical scrolling */
+}
+
+.App {
+  min-height: 100vh;
+  background: #fbfbfd;
+  position: relative;
+  overflow-y: auto; /* Allow vertical scrolling */
+  z-index: 1;
+  pointer-events: auto;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.021em;
+  color: #1d1d1f;
+}
+
+h1 {
+  font-size: 48px;
+  line-height: 1.08349;
+}
+
+h2 {
+  font-size: 40px;
+  line-height: 1.1;
+}
+
+h3 {
+  font-size: 28px;
+  line-height: 1.14286;
+}
+
+p {
+  font-size: 17px;
+  line-height: 1.47059;
+  letter-spacing: -0.022em;
+  color: #515154;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  border: none;
+  position: relative;
+  z-index: 1;
+}
+
+.glass-card:hover {
+  transform: scale(1.01);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.primary-button {
+  background: #0071e3;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 980px;
+  color: #ffffff;
+  font-weight: 500;
+  font-size: 17px;
+  line-height: 1.23536;
+  letter-spacing: -0.022em;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+.primary-button:hover {
+  background: #0077ED;
+  transform: translateY(-1px);
+}
+
+.secondary-button {
+  background: rgba(0, 0, 0, 0.04);
+  border: none;
+  padding: 12px 24px;
+  border-radius: 980px;
+  color: #1d1d1f;
+  font-weight: 500;
+  font-size: 17px;
+  line-height: 1.23536;
+  letter-spacing: -0.022em;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+.secondary-button:hover {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.text-button {
+  background: transparent;
+  border: none;
+  padding: 12px 16px;
+  color: #0071e3;
+  font-weight: 500;
+  font-size: 17px;
+  line-height: 1.23536;
+  letter-spacing: -0.022em;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+.text-button:hover {
+  text-decoration: underline;
+}
+
+/* Apply consistent spacing */
+.section {
+  padding: 80px 0;
+}
+
+.container {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Optional dark mode for specific sections */
+.dark-section {
+  background: #000000;
+  color: #f5f5f7;
+}
+
+.dark-section h1,
+.dark-section h2,
+.dark-section h3,
+.dark-section h4,
+.dark-section h5,
+.dark-section h6 {
+  color: #f5f5f7;
+}
+
+.dark-section p {
+  color: #a1a1a6;
+}
+
+/* Design accent colors */
+.accent-blue { color: #0071e3; }
+.accent-green { color: #68cc45; }
+.accent-purple { color: #7d55c7; }
+.accent-orange { color: #f56300; }
+
+/* Core layout utilities */
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 24px;
+}
+
+/* Additional Apple design utilities */
+.transition-all {
+  transition: all 0.3s cubic-bezier(0.28, 0.11, 0.32, 1);
+}
+
+.hover-scale {
+  transition: transform 0.3s cubic-bezier(0.28, 0.11, 0.32, 1);
+}
+
+.hover-scale:hover {
+  transform: scale(1.01);
+}
+
+.focus-ring {
+  outline: none;
+  transition: box-shadow 0.2s ease;
+}
+
+.focus-ring:focus-visible {
+  box-shadow: 0 0 0 4px rgba(0, 125, 250, 0.6);
+}
+
+/* Image treatment */
+.img-fill {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.img-contain {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Typography utilitities */
+.text-headline {
+  font-size: 48px;
+  line-height: 1.08349;
+  font-weight: 600;
+  letter-spacing: -0.003em;
+}
+
+.text-subhead {
+  font-size: 28px;
+  line-height: 1.14286;
+  font-weight: 600;
+  letter-spacing: 0.007em;
+}
+
+.text-caption {
+  font-size: 12px;
+  line-height: 1.33341;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* Remove old styles that aren't needed */
+.cosmic-bg,
+.nebula-button,
+.glass-card:hover {
+  /* Fix z-index to ensure elements can be clicked */
+  z-index: 0;
+}
+
+/* Ensure other elements have proper z-index for interactions */
+.glass-card, .primary-button, .secondary-button, .text-button {
+  position: relative;
+  z-index: 1;
+} 
