@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vision-ai-web
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    networks:
+      - vision-ai-network
+    # Uncomment if you have environment variables
+    # environment:
+    #   - NODE_ENV=production
+    #   - API_URL=https://api.example.com
+
+  # Uncomment if you need a backend service
+  # api:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   container_name: vision-ai-api
+  #   ports:
+  #     - "3000:3000"
+  #   restart: unless-stopped
+  #   networks:
+  #     - vision-ai-network
+  #   environment:
+  #     - NODE_ENV=production
+  #   volumes:
+  #     - api-data:/app/data
+
+networks:
+  vision-ai-network:
+    driver: bridge
+
+# Uncomment if you need persistent volumes
+# volumes:
+#   api-data: 
