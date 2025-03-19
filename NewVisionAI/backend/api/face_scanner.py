@@ -19,6 +19,53 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in current_app.config['ALLOWED_EXTENSIONS']
 
+def validate_file_type(file):
+    """
+    Validate file content type for security.
+    
+    Args:
+        file: The uploaded file object
+        
+    Returns:
+        bool: True if file type is valid, False otherwise
+    """
+    # List of allowed content types
+    allowed_content_types = [
+        'image/jpeg', 
+        'image/jpg', 
+        'image/png',
+        'image/webp'
+    ]
+    
+    # Check MIME type
+    if file.content_type not in allowed_content_types:
+        return False
+    
+    # Additional validation - read first few bytes and check file signature
+    # This helps prevent content-type spoofing
+    file_signature = file.read(12)  # Read first 12 bytes for signature check
+    file.seek(0)  # Reset file pointer
+    
+    # JPEG signature check: starts with bytes FF D8 FF
+    jpeg_signature = b'\xFF\xD8\xFF'
+    
+    # PNG signature check: starts with bytes 89 50 4E 47 0D 0A 1A 0A
+    png_signature = b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A'
+    
+    # WebP signature check: starts with RIFF and contains WEBP
+    webp_signature_start = b'RIFF'
+    webp_signature_content = b'WEBP'
+    
+    if file.content_type.startswith('image/jp') and not file_signature.startswith(jpeg_signature):
+        return False
+    elif file.content_type == 'image/png' and not file_signature.startswith(png_signature):
+        return False
+    elif file.content_type == 'image/webp' and (not file_signature.startswith(webp_signature_start) or webp_signature_content not in file.read(20)):
+        file.seek(0)  # Reset file pointer again
+        return False
+    
+    return True
+
 @face_scanner.route('/upload', methods=['POST'])
 @jwt_required()
 def upload_face_scan():
@@ -35,20 +82,37 @@ def upload_face_scan():
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
     
-    # Check if file is allowed
+    # Check if file has valid content type
+    if not validate_file_type(file):
+        return jsonify({'error': 'Invalid file type. Only JPEG, PNG and WebP images are allowed.'}), 400
+    
+    # Check if file has allowed extension
     if not allowed_file(file.filename):
-        return jsonify({'error': 'File type not allowed'}), 400
+        return jsonify({'error': 'File type not allowed. Only JPEG, PNG and WebP extensions are permitted.'}), 400
     
     # Generate unique filename
     filename = secure_filename(file.filename)
     file_ext = filename.rsplit('.', 1)[1].lower()
     unique_filename = f"{uuid.uuid4().hex}.{file_ext}"
     
+    # Set file size limit (5MB)
+    file_size_limit = 5 * 1024 * 1024  # 5MB in bytes
+    file.seek(0, os.SEEK_END)
+    file_size = file.tell()
+    file.seek(0)
+    
+    if file_size > file_size_limit:
+        return jsonify({'error': f'File too large. Maximum size is 5MB.'}), 400
+    
     # Save file to uploads directory
     upload_folder = current_app.config['UPLOAD_FOLDER']
     os.makedirs(os.path.join(upload_folder, 'face_scans'), exist_ok=True)
     file_path = os.path.join(upload_folder, 'face_scans', unique_filename)
-    file.save(file_path)
+    
+    try:
+        file.save(file_path)
+    except Exception as e:
+        return jsonify({'error': f'Error saving file: {str(e)}'}), 500
     
     # Emit status update to the client
     socketio.emit('processing_update', 
@@ -78,6 +142,10 @@ def upload_face_scan():
 def process_face_scan(scan_id):
     """Process a previously uploaded face scan."""
     current_user_id = get_jwt_identity()
+    
+    # Validate scan_id to prevent path traversal
+    if not scan_id.isalnum() or '..' in scan_id:
+        return jsonify({'error': 'Invalid scan ID format'}), 400
     
     # Check if scan exists
     file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'face_scans', scan_id)

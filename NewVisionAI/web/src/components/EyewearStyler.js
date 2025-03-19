@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -20,6 +20,8 @@ import StyleIcon from '@mui/icons-material/Style';
 import ColorLensIcon from '@mui/icons-material/ColorLens';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import FaceIcon from '@mui/icons-material/Face';
+import { theme } from '../theme';
+import aiService from '../utils/aiService';
 
 // Clean and modern styling
 const styles = {
@@ -92,9 +94,11 @@ const styles = {
   }
 };
 
-const EyewearStyler = ({ faceAnalysis, onRecommendationSelected }) => {
+const EyewearStyler = ({ aiMeasurements, onRecommendationSelected }) => {
+  const [products, setProducts] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
   const [stylePreferences, setStylePreferences] = useState({
     modern: true,
     classic: false,
@@ -110,92 +114,71 @@ const EyewearStyler = ({ faceAnalysis, onRecommendationSelected }) => {
     metallic: true
   });
   const [priceRange, setPriceRange] = useState([50, 300]);
+  const cancelTokenRef = useRef(null);
 
-  const generateRecommendations = async () => {
-    setLoading(true);
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+  // Get theme colors based on dark mode
+  const colors = theme.getModeColors(darkMode);
+  
+  // Cleanup effect to cancel any pending requests
+  useEffect(() => {
+    return () => {
+      if (cancelTokenRef.current) {
+        cancelTokenRef.current.cancel();
+      }
+    };
+  }, []);
+
+  // Get AI-recommended products if measurements are available
+  useEffect(() => {
+    const getRecommendations = async () => {
+      if (!aiMeasurements) return;
       
-      // Sample data - in a real app, this would come from an API
-      const eyewearDatabase = [
-        {
-          id: 'ew-001',
-          name: 'Modern Square',
-          brand: 'NewVision',
-          shape: 'square',
-          material: 'acetate',
-          color: 'black',
-          style: 'modern',
-          price: 129.99,
-          confidenceScore: 0.91,
-          imageUrl: 'https://images.unsplash.com/photo-1600185365483-26d7a4cc7519',
-          bestFor: ['square', 'oval', 'heart'],
-          features: ['blue light filtering', 'anti-scratch coating']
-        },
-        {
-          id: 'ew-002',
-          name: 'Classic Round',
-          brand: 'OpticLux',
-          shape: 'round',
-          material: 'metal',
-          color: 'gold',
-          style: 'classic',
-          price: 159.99,
-          confidenceScore: 0.87,
-          imageUrl: 'https://images.unsplash.com/photo-1577803645773-f96470509666',
-          bestFor: ['square', 'rectangular', 'diamond'],
-          features: ['polarized', 'lightweight']
-        },
-        {
-          id: 'ew-003',
-          name: 'Minimalist Rectangle',
-          brand: 'PureFrame',
-          shape: 'rectangular',
-          material: 'titanium',
-          color: 'black',
-          style: 'minimalist',
-          price: 249.99,
-          confidenceScore: 0.95,
-          imageUrl: 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371',
-          bestFor: ['round', 'oval', 'heart'],
-          features: ['hypoallergenic', 'memory titanium']
+      // Cancel any previous request
+      if (cancelTokenRef.current) {
+        cancelTokenRef.current.cancel();
+      }
+
+      try {
+        setLoading(true);
+        
+        // Create a new cancelable request
+        cancelTokenRef.current = aiService.createCancelableRequest();
+        
+        // Use the AI service to get recommendations instead of local TensorFlow
+        const recommendationData = await aiService.getEyewearRecommendations(
+          aiMeasurements,
+          {},
+          { cancelToken: cancelTokenRef.current.cancelToken }
+        );
+        
+        // Check if request was canceled
+        if (recommendationData && recommendationData.canceled) {
+          return;
         }
-      ];
-      
-      const faceShape = faceAnalysis?.faceShape?.primaryShape || 'oval';
-      
-      // Filter by preferences
-      let filtered = eyewearDatabase.filter(item => {
-        // Check style preference
-        if (!stylePreferences[item.style]) return false;
         
-        // Check color preference
-        if (!colorPreferences[item.color]) return false;
+        // Fetch the recommended products
+        const response = await fetch('/api/products/recommended', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            measurements: aiMeasurements,
+            recommendations: recommendationData
+          }),
+        });
         
-        // Check price range
-        if (item.price < priceRange[0] || item.price > priceRange[1]) return false;
-        
-        return true;
-      });
-      
-      // Sort by compatibility with face shape
-      filtered = filtered.sort((a, b) => {
-        const aCompatible = a.bestFor.includes(faceShape);
-        const bCompatible = b.bestFor.includes(faceShape);
-        
-        if (aCompatible && !bCompatible) return -1;
-        if (!aCompatible && bCompatible) return 1;
-        return b.confidenceScore - a.confidenceScore;
-      });
-      
-      setRecommendations(filtered);
-    } catch (error) {
-      console.error('Error generating recommendations:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        const recommendedProducts = await response.json();
+        setRecommendations(recommendedProducts);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error getting recommendations:', error);
+        setLoading(false);
+      }
+    };
+
+    getRecommendations();
+  }, [aiMeasurements]);
 
   const handleStyleChange = (event) => {
     setStylePreferences({
@@ -292,7 +275,7 @@ const EyewearStyler = ({ faceAnalysis, onRecommendationSelected }) => {
             variant="contained"
             fullWidth
             sx={styles.recommendButton}
-            onClick={generateRecommendations}
+            onClick={() => {}}
             startIcon={<AutoAwesomeIcon />}
             disabled={loading}
           >

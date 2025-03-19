@@ -1,4 +1,4 @@
-from api.auth import auth
+from api.auth import auth_bp as auth
 from api.user import user
 from api.products import products
 from api.measurements import measurements

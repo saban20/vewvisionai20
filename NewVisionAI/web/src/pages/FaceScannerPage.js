@@ -1,4 +1,4 @@
-import React, { useState, Suspense, useContext } from 'react';
+import React, { useState, Suspense, useContext, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -6,30 +6,54 @@ import {
   Box,
   Button,
   Grid,
-  useTheme,
   useMediaQuery,
   Paper,
   Divider,
+  CircularProgress
 } from '@mui/material';
 import { motion } from 'framer-motion';
-
-// Import new components
-import FaceScanner3D from '../components/FaceScanner3D';
-import EyewearStyler from '../components/EyewearStyler';
-import MeasurementsPanel from '../components/MeasurementsPanel';
-import CosmicLoader from '../components/CosmicLoader';
-import RealtimeFaceAnalysis from '../components/FaceScanner/RealtimeFaceAnalysis';
-
 // Import Socket Context
 import { useSocket } from '../context/SocketContext';
+// Import centralized theme
+import { theme } from '../theme';
+
+// Lazy load heavy components
+const FaceScanner3D = lazy(() => import('../components/FaceScanner3D'));
+const EyewearStyler = lazy(() => import('../components/EyewearStyler'));
+const MeasurementsPanel = lazy(() => import('../components/MeasurementsPanel'));
+const CosmicLoader = lazy(() => import('../components/CosmicLoader'));
+const RealtimeFaceAnalysis = lazy(() => import('../components/FaceScanner/RealtimeFaceAnalysis'));
+const GamifiedMeasurementDarkTheme = lazy(() => import('../components/FaceScanner/GamifiedMeasurementDarkTheme'));
+
+// Fallback component for lazy loading
+const ComponentLoader = () => (
+  <Box sx={{ 
+    display: 'flex', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    py: theme.spacing.xxl,
+    flexDirection: 'column'
+  }}>
+    <CircularProgress size={60} sx={{ 
+      color: theme.colors.primary,
+      boxShadow: '0 0 15px rgba(110, 86, 207, 0.5)',
+    }} />
+    <Typography variant="body1" sx={{ mt: theme.spacing.md }}>
+      Loading component...
+    </Typography>
+  </Box>
+);
 
 /**
  * Enhanced Face Scanner Page with 3D scanning, styling, and measurements
  */
 const FaceScannerPage = ({ showNotification }) => {
-  const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
+  const [darkMode, setDarkMode] = useState(true);
+  
+  // Get theme colors based on dark mode
+  const colors = theme.getModeColors(darkMode);
   
   // Get socket context with default fallback values
   const socketContext = useSocket() || {};
@@ -46,222 +70,178 @@ const FaceScannerPage = ({ showNotification }) => {
     if (data.measurementId) {
       setMeasurementId(data.measurementId);
     }
-    setActiveComponent('styler');
-    showNotification('Face scan completed successfully! Now try on some frames.', 'success');
+    
+    // Transition to eyewear component
+    showNotification('Measurements completed successfully!', 'success');
+    setActiveComponent('eyewear');
+  };
+  
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
   };
 
-  // Navigation helper
-  const handleNavigate = (section) => {
-    if ((section === 'styler' || section === 'measurements') && !userData) {
-      showNotification('Please complete a face scan first', 'warning');
-      return;
+  // Animation variants for page transitions
+  const pageVariants = {
+    initial: { opacity: 0, y: 20 },
+    in: { opacity: 1, y: 0 },
+    out: { opacity: 0, y: -20 }
+  };
+
+  // Render active component based on state
+  const renderActiveComponent = () => {
+    switch (activeComponent) {
+      case 'scanner':
+        return (
+          <Suspense fallback={<ComponentLoader />}>
+            <GamifiedMeasurementDarkTheme 
+              onMeasurementComplete={handleMeasurements}
+            />
+          </Suspense>
+        );
+      case 'eyewear':
+        return (
+          <Suspense fallback={<ComponentLoader />}>
+            <EyewearStyler 
+              aiMeasurements={userData} 
+            />
+          </Suspense>
+        );
+      case 'measurements':
+        return (
+          <Suspense fallback={<ComponentLoader />}>
+            <MeasurementsPanel 
+              measurementId={measurementId}
+              measurements={userData} 
+              darkMode={darkMode}
+            />
+          </Suspense>
+        );
+      default:
+        return (
+          <Box sx={{ 
+            textAlign: 'center', 
+            padding: theme.spacing.lg, 
+            backgroundColor: colors.cardLight,
+            borderRadius: theme.borderRadius.md
+          }}>
+            <Typography variant="h5" color={colors.text}>
+              Please select a component to view
+            </Typography>
+          </Box>
+        );
     }
-    setActiveComponent(section);
   };
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 2 }}>
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-      >
-        <Typography variant="h3" component="h1" gutterBottom align="center">
-          AI Face Analysis System
-        </Typography>
-        <Typography variant="h6" align="center" color="text.secondary" paragraph>
-          Scan your face to get precise measurements and eyewear recommendations
-        </Typography>
-      </motion.div>
-
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
-        <Button 
-          variant={activeComponent === 'scanner' ? 'contained' : 'outlined'}
-          onClick={() => handleNavigate('scanner')}
-          className={activeComponent === 'scanner' ? 'nebula-button' : ''}
-          sx={{
-            py: 1.2,
-            px: 3,
-            borderRadius: '8px',
-            background: activeComponent === 'scanner' 
-              ? 'linear-gradient(45deg, #6E56CF 30%, #FF1493 90%)'
-              : 'transparent',
-            boxShadow: activeComponent === 'scanner' 
-              ? '0 0 15px rgba(110, 86, 207, 0.5)'
-              : 'none',
-            '&:hover': {
-              boxShadow: '0 0 15px rgba(110, 86, 207, 0.3)',
-            }
-          }}
-        >
-          Face Scanner
-        </Button>
-        
-        <Button 
-          variant={activeComponent === 'styler' ? 'contained' : 'outlined'}
-          onClick={() => handleNavigate('styler')}
-          disabled={!userData}
-          className={activeComponent === 'styler' ? 'nebula-button' : ''}
-          sx={{
-            py: 1.2,
-            px: 3,
-            borderRadius: '8px',
-            background: activeComponent === 'styler' 
-              ? 'linear-gradient(45deg, #6E56CF 30%, #FF1493 90%)'
-              : 'transparent',
-            boxShadow: activeComponent === 'styler' 
-              ? '0 0 15px rgba(110, 86, 207, 0.5)'
-              : 'none',
-            '&:hover': {
-              boxShadow: '0 0 15px rgba(110, 86, 207, 0.3)',
-            }
-          }}
-        >
-          Try Eyewear
-        </Button>
-        
-        <Button 
-          variant={activeComponent === 'measurements' ? 'contained' : 'outlined'}
-          onClick={() => handleNavigate('measurements')}
-          disabled={!userData}
-          className={activeComponent === 'measurements' ? 'nebula-button' : ''}
-          sx={{
-            py: 1.2,
-            px: 3,
-            borderRadius: '8px',
-            background: activeComponent === 'measurements' 
-              ? 'linear-gradient(45deg, #6E56CF 30%, #FF1493 90%)'
-              : 'transparent',
-            boxShadow: activeComponent === 'measurements' 
-              ? '0 0 15px rgba(110, 86, 207, 0.5)'
-              : 'none',
-            '&:hover': {
-              boxShadow: '0 0 15px rgba(110, 86, 207, 0.3)',
-            }
-          }}
-        >
-          View Measurements
-        </Button>
-        
-        <Button 
-          variant={activeComponent === 'realtime' ? 'contained' : 'outlined'}
-          onClick={() => setActiveComponent('realtime')}
-          className={activeComponent === 'realtime' ? 'nebula-button' : ''}
-          sx={{
-            py: 1.2,
-            px: 3,
-            borderRadius: '8px',
-            background: activeComponent === 'realtime' 
-              ? 'linear-gradient(45deg, #6E56CF 30%, #FF1493 90%)'
-              : 'transparent',
-            boxShadow: activeComponent === 'realtime' 
-              ? '0 0 15px rgba(110, 86, 207, 0.5)'
-              : 'none',
-            '&:hover': {
-              boxShadow: '0 0 15px rgba(110, 86, 207, 0.3)',
-            }
-          }}
-        >
-          Real-Time Analysis
-        </Button>
-      </Box>
-
-      <Paper
-        elevation={4}
-        sx={{
-          borderRadius: '16px',
-          overflow: 'hidden',
-          backgroundColor: 'rgba(18, 18, 38, 0.7)',
-          border: '1px solid rgba(110, 86, 207, 0.3)',
-          backdropFilter: 'blur(10px)',
-          p: 3,
-          mb: 4,
-          position: 'relative'
-        }}
-      >
-        <Box sx={{ perspective: '1000px' }}>
-          <Suspense fallback={<CosmicLoader />}>
-            <motion.div
-              initial={{ rotateX: 20, opacity: 0 }}
-              animate={{ rotateX: 0, opacity: 1 }}
-              transition={{ duration: 0.8 }}
-              style={{ transformStyle: 'preserve-3d' }}
-            >
-              {activeComponent === 'scanner' && (
-                <FaceScanner3D onMeasurementsComplete={handleMeasurements} />
-              )}
-              {activeComponent === 'styler' && (
-                <EyewearStyler aiMeasurements={userData} />
-              )}
-              {activeComponent === 'measurements' && (
-                <MeasurementsPanel measurements={userData} />
-              )}
-              {activeComponent === 'realtime' && (
-                <Grid container spacing={3}>
-                  <Grid item xs={12}>
-                    <RealtimeFaceAnalysis 
-                      userId={userData?.userId} 
-                      measurementId={measurementId} 
-                    />
-                  </Grid>
-                  
-                  {/* Socket connection status */}
-                  <Grid item xs={12} sx={{ mt: 2 }}>
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 1,
-                      p: 2,
-                      bgcolor: socketReady ? 'success.dark' : 'error.dark',
-                      borderRadius: 1
-                    }}>
-                      <Box 
-                        sx={{ 
-                          width: 12, 
-                          height: 12, 
-                          borderRadius: '50%',
-                          bgcolor: socketReady ? 'success.light' : 'error.light',
-                          boxShadow: socketReady 
-                            ? '0 0 10px rgba(76, 175, 80, 0.7)' 
-                            : '0 0 10px rgba(244, 67, 54, 0.7)'
-                        }} 
-                      />
-                      <Typography variant="body2">
-                        {socketReady 
-                          ? 'Real-time connection established' 
-                          : 'Real-time connection not available'}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-              )}
-            </motion.div>
-          </Suspense>
-        </Box>
-      </Paper>
-
-      {userData && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
-          <Button 
-            variant="contained"
-            onClick={() => navigate('/shop')}
-            sx={{
-              py: 1.5,
-              px: 4,
-              fontSize: '1.1rem',
-              background: 'linear-gradient(45deg, #FF1493 30%, #6E56CF 90%)',
-              boxShadow: '0 0 15px rgba(255, 20, 147, 0.5)',
-              borderRadius: '8px',
-              '&:hover': {
-                boxShadow: '0 0 20px rgba(110, 86, 207, 0.7)',
-              }
+    <motion.div
+      initial="initial"
+      animate="in"
+      exit="out"
+      variants={pageVariants}
+      transition={{ duration: 0.4 }}
+    >
+      <Container maxWidth="xl" sx={{ py: theme.spacing.lg }}>
+        <Box sx={{ mb: theme.spacing.lg }}>
+          <Typography 
+            variant="h4" 
+            component="h1" 
+            fontWeight={theme.typography.fontWeights.bold}
+            sx={{ 
+              mb: theme.spacing.md, 
+              color: colors.text,
+              textAlign: 'center' 
             }}
           >
-            Browse All Eyewear
-          </Button>
+            Advanced Face Scanner
+          </Typography>
+          <Typography 
+            variant="body1" 
+            sx={{ 
+              mb: theme.spacing.lg, 
+              textAlign: 'center',
+              color: colors.textSecondary
+            }}
+          >
+            Get precise facial measurements and find the perfect eyewear for your face shape.
+          </Typography>
+
+          {/* Navigation tabs */}
+          <Grid container spacing={2} justifyContent="center" sx={{ mb: theme.spacing.lg }}>
+            <Grid item>
+              <Button
+                variant={activeComponent === 'scanner' ? 'contained' : 'outlined'}
+                onClick={() => setActiveComponent('scanner')}
+                sx={{
+                  borderRadius: theme.borderRadius.pill,
+                  px: theme.spacing.lg,
+                  py: theme.spacing.sm,
+                  backgroundColor: activeComponent === 'scanner' ? theme.colors.primary : 'transparent',
+                  color: activeComponent === 'scanner' ? '#fff' : colors.text,
+                  borderColor: colors.border,
+                  '&:hover': {
+                    backgroundColor: activeComponent === 'scanner' ? theme.colors.primaryDark : 'rgba(0,0,0,0.04)',
+                  }
+                }}
+              >
+                Face Scanner
+              </Button>
+            </Grid>
+            <Grid item>
+              <Button
+                variant={activeComponent === 'eyewear' ? 'contained' : 'outlined'}
+                onClick={() => setActiveComponent('eyewear')}
+                disabled={!userData}
+                sx={{
+                  borderRadius: theme.borderRadius.pill,
+                  px: theme.spacing.lg,
+                  py: theme.spacing.sm,
+                  backgroundColor: activeComponent === 'eyewear' ? theme.colors.primary : 'transparent',
+                  color: activeComponent === 'eyewear' ? '#fff' : colors.text,
+                  borderColor: colors.border,
+                  '&:hover': {
+                    backgroundColor: activeComponent === 'eyewear' ? theme.colors.primaryDark : 'rgba(0,0,0,0.04)',
+                  }
+                }}
+              >
+                Virtual Try-On
+              </Button>
+            </Grid>
+            <Grid item>
+              <Button
+                variant={activeComponent === 'measurements' ? 'contained' : 'outlined'}
+                onClick={() => setActiveComponent('measurements')}
+                disabled={!userData}
+                sx={{
+                  borderRadius: theme.borderRadius.pill,
+                  px: theme.spacing.lg,
+                  py: theme.spacing.sm,
+                  backgroundColor: activeComponent === 'measurements' ? theme.colors.primary : 'transparent',
+                  color: activeComponent === 'measurements' ? '#fff' : colors.text,
+                  borderColor: colors.border,
+                  '&:hover': {
+                    backgroundColor: activeComponent === 'measurements' ? theme.colors.primaryDark : 'rgba(0,0,0,0.04)',
+                  }
+                }}
+              >
+                Measurements
+              </Button>
+            </Grid>
+          </Grid>
+
+          {/* Main content area */}
+          <Box sx={{ 
+            backgroundColor: colors.background,
+            borderRadius: theme.borderRadius.lg,
+            overflow: 'hidden',
+            boxShadow: theme.getBoxShadow(darkMode),
+            transition: theme.transitions.default
+          }}>
+            {renderActiveComponent()}
+          </Box>
         </Box>
-      )}
-    </Container>
+      </Container>
+    </motion.div>
   );
 };
 

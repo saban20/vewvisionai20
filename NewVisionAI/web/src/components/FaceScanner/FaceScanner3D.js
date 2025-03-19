@@ -5,8 +5,9 @@ import { Box, Typography, Button, Card, CardContent, CircularProgress, Alert } f
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import Webcam from 'react-webcam';
-import * as tf from '@tensorflow/tfjs';
 import * as THREE from 'three';
+import aiService from '../../utils/aiService';
+import { theme } from '../../theme';
 
 const FaceModel = ({ imageTexture }) => {
   const { scene } = useGLTF('/models/face.glb');
@@ -57,33 +58,47 @@ const FaceScanner3D = ({ onScanComplete }) => {
   const [error, setError] = useState(null);
   const webcamRef = useRef(null);
   const fileInputRef = useRef(null);
+  const cancelTokenRef = useRef(null);
   
+  // Add cleanup effect to dispose textures
   useEffect(() => {
-    const loadModel = async () => {
-      try {
-        await tf.ready();
-        await tf.loadLayersModel('/models/facemesh/model.json');
-      } catch (err) {
-        console.error('Error loading TensorFlow.js model:', err);
-        setError('Failed to load face detection model. Please try again later.');
-      }
-    };
-    
-    loadModel();
+    // Cleanup function to dispose textures when component unmounts
+    // or when a new texture is set
     return () => {
       if (imageTexture) {
         imageTexture.dispose();
       }
     };
+  }, [imageTexture]);
+  
+  // Add effect to cancel any pending requests when component unmounts
+  useEffect(() => {
+    return () => {
+      // Cancel any pending requests when component unmounts
+      if (cancelTokenRef.current) {
+        cancelTokenRef.current.cancel();
+      }
+    };
   }, []);
-
+  
   const handleCaptureFromWebcam = async () => {
     if (webcamRef.current) {
       try {
+        // Cancel any previous request
+        if (cancelTokenRef.current) {
+          cancelTokenRef.current.cancel();
+        }
+        
+        // Create a new cancelable request
+        cancelTokenRef.current = aiService.createCancelableRequest();
+        
         setIsProcessing(true);
+        setError(null);
+        
         const imageSrc = webcamRef.current.getScreenshot();
         if (!imageSrc) throw new Error('Failed to capture image from webcam');
         
+        // Create texture for 3D model
         const img = new Image();
         img.src = imageSrc;
         
@@ -96,26 +111,28 @@ const FaceScanner3D = ({ onScanComplete }) => {
           };
         });
         
-        // If onScanComplete is provided, prepare the scan results
+        // Process face with backend AI service instead of client-side TensorFlow
         if (onScanComplete) {
-          // Simulated scan results
-          onScanComplete({
-            measurements: {
-              pupillaryDistance: Math.floor(Math.random() * 10) + 60, // 60-69mm
-              bridgeWidth: Math.floor(Math.random() * 5) + 15, // 15-19mm
-              templeWidth: Math.floor(Math.random() * 20) + 130 // 130-149mm
-            },
-            faceShape: ['oval', 'round', 'square', 'heart', 'diamond'][Math.floor(Math.random() * 5)],
-            faceShapeConfidence: 0.85,
-            recommendedStyle: ['classic', 'modern', 'aviator', 'circular'][Math.floor(Math.random() * 4)],
-            frameRecommendations: ['Ray-Ban Wayfarer', 'Warby Parker Harper', 'Oakley Holbrook'],
-            scanQuality: 0.9,
-            timestamp: Date.now()
-          });
+          // Remove the base64 prefix for the API call
+          const base64Image = imageSrc.split(',')[1];
+          
+          // Use the AI service to process the face with cancelation support
+          const scanResults = await aiService.processFace(
+            base64Image, 
+            { cancelToken: cancelTokenRef.current.cancelToken }
+          );
+          
+          // Check if request was canceled
+          if (scanResults && scanResults.canceled) {
+            return;
+          }
+          
+          // Pass the results to the callback
+          onScanComplete(scanResults);
         }
       } catch (err) {
         console.error('Error capturing from webcam:', err);
-        setError('Failed to capture image from webcam. Please try again.');
+        setError('Failed to process face: ' + (err.message || 'Unknown error'));
       } finally {
         setIsProcessing(false);
       }
@@ -126,31 +143,49 @@ const FaceScanner3D = ({ onScanComplete }) => {
     const file = event.target.files[0];
     if (file) {
       try {
+        // Cancel any previous request
+        if (cancelTokenRef.current) {
+          cancelTokenRef.current.cancel();
+        }
+        
+        // Create a new cancelable request
+        cancelTokenRef.current = aiService.createCancelableRequest();
+        
         setIsProcessing(true);
+        setError(null);
+        
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
           const img = new Image();
           img.src = e.target.result;
-          img.onload = () => {
+          img.onload = async () => {
             const texture = new THREE.TextureLoader().load(img.src);
             setImageTexture(texture);
             
-            // If onScanComplete is provided, prepare the scan results
+            // Process face with backend AI service instead of client-side TensorFlow
             if (onScanComplete) {
-              // Simulated scan results
-              onScanComplete({
-                measurements: {
-                  pupillaryDistance: Math.floor(Math.random() * 10) + 60, // 60-69mm
-                  bridgeWidth: Math.floor(Math.random() * 5) + 15, // 15-19mm
-                  templeWidth: Math.floor(Math.random() * 20) + 130 // 130-149mm
-                },
-                faceShape: ['oval', 'round', 'square', 'heart', 'diamond'][Math.floor(Math.random() * 5)],
-                faceShapeConfidence: 0.8,
-                recommendedStyle: ['classic', 'modern', 'aviator', 'circular'][Math.floor(Math.random() * 4)],
-                frameRecommendations: ['Ray-Ban Wayfarer', 'Warby Parker Harper', 'Oakley Holbrook'],
-                scanQuality: 0.85,
-                timestamp: Date.now()
-              });
+              try {
+                // Remove the base64 prefix for the API call
+                const base64Image = e.target.result.split(',')[1];
+                
+                // Use the AI service to process the face with cancelation support
+                const scanResults = await aiService.processFace(
+                  base64Image,
+                  { cancelToken: cancelTokenRef.current.cancelToken }
+                );
+                
+                // Check if request was canceled
+                if (scanResults && scanResults.canceled) {
+                  setIsProcessing(false);
+                  return;
+                }
+                
+                // Pass the results to the callback
+                onScanComplete(scanResults);
+              } catch (err) {
+                console.error('Error processing face:', err);
+                setError('Failed to process face: ' + (err.message || 'Unknown error'));
+              }
             }
             
             setIsProcessing(false);
@@ -170,29 +205,34 @@ const FaceScanner3D = ({ onScanComplete }) => {
   };
 
   return (
-    <Card sx={{ backgroundColor: '#1A1A1A', color: '#FFFFFF', p: 2 }}>
+    <Card sx={{ 
+      backgroundColor: theme.colors.cardDark, 
+      color: theme.colors.lightText, 
+      p: theme.spacing.md,
+      borderRadius: theme.borderRadius.md
+    }}>
       <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <CameraAltIcon sx={{ fontSize: 30, color: '#CC0000', mr: 1 }} />
-          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: theme.spacing.md }}>
+          <CameraAltIcon sx={{ fontSize: 30, color: theme.colors.primary, mr: theme.spacing.sm }} />
+          <Typography variant="h5" sx={{ fontWeight: theme.typography.fontWeights.semiBold }}>
             Interactive 3D Face Scanner
           </Typography>
         </Box>
-        <Typography variant="body1" sx={{ mb: 2 }}>
+        <Typography variant="body1" sx={{ mb: theme.spacing.md }}>
           Upload your photo or use your webcam to create a 3D model of your face for virtual eyewear try-on.
         </Typography>
         {error && (
-          <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
+          <Alert severity="error" onClose={() => setError(null)} sx={{ mb: theme.spacing.md }}>
             {error}
           </Alert>
         )}
-        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+        <Box sx={{ display: 'flex', gap: theme.spacing.md, mb: theme.spacing.md }}>
           <Button
             variant="contained"
             startIcon={<CameraAltIcon />}
             onClick={() => setIsCameraActive(!isCameraActive)}
             disabled={isProcessing}
-            sx={{ backgroundColor: '#CC0000' }}
+            sx={{ backgroundColor: theme.colors.primary }}
           >
             {isCameraActive ? 'Close Camera' : 'Use Webcam'}
           </Button>
@@ -201,7 +241,7 @@ const FaceScanner3D = ({ onScanComplete }) => {
             startIcon={<FileUploadIcon />}
             onClick={() => fileInputRef.current.click()}
             disabled={isProcessing}
-            sx={{ color: '#FFFFFF', borderColor: '#FFFFFF' }}
+            sx={{ color: theme.colors.lightText, borderColor: theme.colors.lightText }}
           >
             Upload Photo
           </Button>
@@ -214,26 +254,37 @@ const FaceScanner3D = ({ onScanComplete }) => {
           />
         </Box>
         {isCameraActive && (
-          <Box sx={{ position: 'relative', mb: 2 }}>
+          <Box sx={{ position: 'relative', mb: theme.spacing.md }}>
             <Webcam
               audio={false}
               ref={webcamRef}
               screenshotFormat="image/jpeg"
               width="100%"
               height="auto"
-              style={{ borderRadius: '8px' }}
+              style={{ borderRadius: theme.borderRadius.md }}
             />
             <Button
               variant="contained"
               onClick={handleCaptureFromWebcam}
               disabled={isProcessing}
-              sx={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', backgroundColor: '#CC0000' }}
+              sx={{ 
+                position: 'absolute', 
+                bottom: theme.spacing.sm, 
+                left: '50%', 
+                transform: 'translateX(-50%)', 
+                backgroundColor: theme.colors.primary 
+              }}
             >
               {isProcessing ? <CircularProgress size={24} /> : 'Capture'}
             </Button>
           </Box>
         )}
-        <Box sx={{ height: 400, backgroundColor: '#1A1A1A', borderRadius: '8px', mb: 2 }}>
+        <Box sx={{ 
+          height: 400, 
+          backgroundColor: theme.colors.cardDark, 
+          borderRadius: theme.borderRadius.md, 
+          mb: theme.spacing.md 
+        }}>
           <Canvas>
             <PerspectiveCamera makeDefault position={[0, 0, 5]} />
             <ambientLight intensity={0.5} />
@@ -245,7 +296,7 @@ const FaceScanner3D = ({ onScanComplete }) => {
             <Environment preset="studio" />
           </Canvas>
         </Box>
-        <Typography variant="body2" sx={{ color: '#AAAAAA' }}>
+        <Typography variant="body2" sx={{ color: theme.colors.mutedText }}>
           Rotate, zoom, and view the 3D model from different angles by dragging and scrolling.
         </Typography>
       </CardContent>

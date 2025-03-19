@@ -30,3 +30,13 @@ build/
 Thumbs.db
 *.pack
 .cache/
+
+# Node.js cache files
+**/.cache/
+**/node_modules/.cache/
+**/*.pack
+**/*.pack.old
+
+# Build and cache directories
+**/default-development/
+**/default-production/

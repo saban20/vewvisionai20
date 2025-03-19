@@ -4,6 +4,7 @@ import cv2
 import math
 from flask import current_app
 import mediapipe as mp
+import dlib  # Added for alternative implementation
 
 # Initialize MediaPipe Face Mesh
 mp_face_mesh = mp.solutions.face_mesh
@@ -85,6 +86,22 @@ def detect_face(image_path):
         'orientation': orientation,
         'face_center': face_center
     }
+
+# Alternative implementation using dlib
+def detect_face_dlib(image):
+    """
+    Alternative face detection using dlib.
+    
+    Args:
+        image: Image as numpy array (BGR format from cv2)
+    
+    Returns:
+        List of detected face rectangles
+    """
+    detector = dlib.get_frontal_face_detector()
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    faces = detector(gray)
+    return faces
 
 def calculate_face_orientation(landmarks):
     """
@@ -319,4 +336,103 @@ def extract_measurements(face_data):
         'frame_width': round(frame_width, 1) if frame_width else None,
         'face_width': round(face_width, 1) if face_width else None,
         'face_height': round(face_height, 1) if face_height else None
+    }
+
+# Alternative implementation using dlib for measurement extraction
+def extract_measurements_dlib(face, image):
+    """
+    Extract facial measurements using dlib's shape predictor.
+    
+    Args:
+        face: dlib face rectangle
+        image: Image as numpy array
+        
+    Returns:
+        Dictionary with measurements
+    """
+    # Check if shape predictor model file exists
+    model_path = "shape_predictor_68_face_landmarks.dat"
+    if not os.path.exists(model_path):
+        # In real application, download or give instructions to download
+        return {"error": "Shape predictor model file not found"}
+    
+    predictor = dlib.shape_predictor(model_path)
+    landmarks = predictor(image, face)
+    
+    # Example: Calculate pupillary distance (distance between eye centers)
+    left_eye = landmarks.part(36)  # Left eye corner
+    right_eye = landmarks.part(45)  # Right eye corner
+    pd = ((right_eye.x - left_eye.x) ** 2 + (right_eye.y - left_eye.y) ** 2) ** 0.5
+    
+    # Create a basic measurement dictionary (expand as needed)
+    measurements = {
+        "pupillary_distance": pd * 0.26,  # Approximate conversion to mm
+        "bridge_width": None,  # Can be calculated from landmarks
+        "temple_length": None,  # Can be calculated from landmarks
+        "lens_width": None,     # Can be calculated from landmarks
+        "lens_height": None,    # Can be calculated from landmarks
+        "frame_width": None,    # Can be calculated from landmarks
+    }
+    
+    return measurements 
+
+def detect_face_from_array(image_array):
+    """
+    Detect face in an image array.
+    
+    Args:
+        image_array: Numpy array containing the image
+        
+    Returns:
+        Tuple (face_detected, face_data)
+            face_detected: Boolean indicating if a face was detected
+            face_data: Dictionary with face landmark coordinates if face detected
+    """
+    if image_array is None:
+        return False, None
+    
+    # Make sure image is in RGB
+    if len(image_array.shape) == 3 and image_array.shape[2] == 3:
+        if isinstance(image_array[0, 0, 0], np.uint8):
+            # Likely a BGR image from OpenCV
+            image_rgb = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
+        else:
+            # Assume it's already RGB
+            image_rgb = image_array
+    else:
+        # Unsupported format
+        return False, None
+    
+    # Process with MediaPipe
+    results = face_mesh.process(image_rgb)
+    
+    if not results.multi_face_landmarks:
+        return False, None
+    
+    # Get image dimensions
+    height, width = image_array.shape[:2]
+    
+    # Extract face landmarks
+    face_landmarks = results.multi_face_landmarks[0]
+    landmarks = {}
+    
+    for idx, landmark in enumerate(face_landmarks.landmark):
+        # Convert normalized coordinates to pixel coordinates
+        x = int(landmark.x * width)
+        y = int(landmark.y * height)
+        z = landmark.z
+        landmarks[idx] = (x, y, z)
+    
+    # Calculate face orientation from landmarks
+    orientation = calculate_face_orientation(landmarks)
+    
+    # Calculate face center
+    face_center = calculate_face_center(landmarks)
+    
+    return True, {
+        'landmarks': landmarks,
+        'image_width': width,
+        'image_height': height,
+        'orientation': orientation,
+        'face_center': face_center
     } 

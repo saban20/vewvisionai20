@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
-import AIEyewearEngine from './AIEyewearEngine';
-import './App.css';
+import AIEyewearEngine from '../utils/AIEyewearEngine';
+import '../App.css';
 
 const FaceScanner3D = ({ onResults, isIOS = false }) => {
   const videoRef = useRef(null);

@@ -1,0 +1,9 @@
+# Files to remove from Git history
+node_modules/
+node_modules/.cache/
+**/*.pack
+**/*.pack.old
+**/tfjs/dist/
+**/typescript/lib/
+**/.env
+**/NewVisionAI/backend/.env 

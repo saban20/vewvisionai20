@@ -7,8 +7,8 @@ from datetime import datetime
 
 from models import Measurement, FaceAnalysis
 from config.database import db
-from ..utils.face_detection import detect_face, extract_measurements
-from ..utils.face_analysis import analyze_face
+from utils.face_detection import detect_face, extract_measurements
+from utils.face_analysis import analyze_face
 
 measurements = Blueprint('measurements', __name__, url_prefix='/api/measurements')
 
@@ -18,10 +18,17 @@ def get_all_measurements():
     """Get all measurements for the current user."""
     current_user_id = get_jwt_identity()
     
-    all_measurements = Measurement.query.filter_by(user_id=current_user_id).all()
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    
+    # Apply pagination
+    paginated_measurements = Measurement.query.filter_by(user_id=current_user_id) \
+        .order_by(Measurement.created_at.desc()) \
+        .paginate(page=page, per_page=per_page, error_out=False)
     
     result = []
-    for measurement in all_measurements:
+    for measurement in paginated_measurements.items:
         measurement_data = measurement.to_dict()
         if measurement.face_analysis:
             measurement_data['face_analysis'] = {
@@ -32,7 +39,13 @@ def get_all_measurements():
             }
         result.append(measurement_data)
     
-    return jsonify(result), 200
+    return jsonify({
+        'measurements': result,
+        'total': paginated_measurements.total,
+        'pages': paginated_measurements.pages,
+        'page': page,
+        'per_page': per_page
+    }), 200
 
 @measurements.route('/<int:measurement_id>', methods=['GET'])
 @jwt_required()

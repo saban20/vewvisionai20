@@ -1,15 +1,23 @@
 import React, { useState, useEffect, useContext, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Box, CircularProgress, Snackbar, Alert, Typography } from '@mui/material';
+import { Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
+import { Box, CircularProgress, Snackbar, Alert, Typography, AppBar, Toolbar, Button, IconButton, Drawer, List, ListItem, ListItemIcon, ListItemText, Divider, useMediaQuery } from '@mui/material';
 import './App.css'; // Import the cosmic-themed CSS
+import MenuIcon from '@mui/icons-material/Menu';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import FaceIcon from '@mui/icons-material/Face';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import SettingsIcon from '@mui/icons-material/Settings';
+import BugReportIcon from '@mui/icons-material/BugReport';
+import ThemeToggle from '../src/components/ThemeToggle';
+import ComponentTester from '../src/ComponentTester';
 
-// Components
-import Header from './components/Header';
-import Footer from './components/Footer';
-
-// Services & Utilities
+// Context & Utilities
 import { getToken, isTokenValid } from './utils/auth';
-import { AccessibilityContext } from './index';
+import { AccessibilityContext, ThemeContext } from './index';
+
+// Lazy load components - even those used on most pages
+const Header = lazy(() => import('./components/Header'));
+const Footer = lazy(() => import('./components/Footer'));
 
 // Lazy load pages for better performance
 const Home = lazy(() => import('./pages/Home'));
@@ -43,12 +51,29 @@ const PageLoader = () => (
   </Box>
 );
 
+// Smaller loader for components
+const ComponentLoader = () => (
+  <Box 
+    sx={{ 
+      display: 'flex', 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      p: 2
+    }}
+  >
+    <CircularProgress size={24} />
+  </Box>
+);
+
 function App() {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'info' });
   const { voiceAssist, reduceMotion } = useContext(AccessibilityContext);
   const location = useLocation();
+  const isMobile = useMediaQuery('(max-width:600px)');
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const { themeMode } = useContext(ThemeContext);
 
   // Handle screen reader announcements for page changes
   useEffect(() => {
@@ -132,79 +157,114 @@ function App() {
     return children;
   };
 
+  const toggleDrawer = () => {
+    setDrawerOpen(!drawerOpen);
+  };
+
+  const menuItems = [
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+    { text: 'Eyewear', icon: <FaceIcon />, path: '/eyewear' },
+    { text: 'Cart', icon: <ShoppingCartIcon />, path: '/cart' },
+    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+    { text: 'Component Tester', icon: <BugReportIcon />, path: '/tester' },
+  ];
+
+  const drawer = (
+    <Box sx={{ width: 240 }}>
+      <Box sx={{ py: 2, px: 3 }}>
+        <Typography variant="h6">VisionAI</Typography>
+      </Box>
+      <Divider />
+      <List>
+        {menuItems.map((item) => (
+          <ListItem 
+            button 
+            key={item.text} 
+            component={Link} 
+            to={item.path}
+            onClick={toggleDrawer}
+            selected={location.pathname === item.path}
+          >
+            <ListItemIcon>{item.icon}</ListItemIcon>
+            <ListItemText primary={item.text} />
+          </ListItem>
+        ))}
+      </List>
+    </Box>
+  );
+
   if (loading) {
     return <PageLoader />;
   }
 
   return (
-    <div className="App">
-      <div className="cosmic-bg"></div>
+    <Box sx={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      minHeight: '100vh',
+      bgcolor: themeMode === 'dark' ? '#121212' : '#f5f5f7',
+      transition: reduceMotion ? 'none' : 'background-color 0.3s ease'
+    }}>
+      <AppBar position="static" color="primary">
+        <Toolbar>
+          {isMobile ? (
+            <IconButton
+              edge="start"
+              color="inherit"
+              aria-label="menu"
+              onClick={toggleDrawer}
+            >
+              <MenuIcon />
+            </IconButton>
+          ) : null}
+          
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            VisionAI
+          </Typography>
+          
+          <ThemeToggle />
+          
+          {!isMobile && (
+            <Box sx={{ display: 'flex' }}>
+              {menuItems.map((item) => (
+                <Button 
+                  key={item.text}
+                  color="inherit" 
+                  component={Link} 
+                  to={item.path}
+                  startIcon={item.icon}
+                >
+                  {item.text}
+                </Button>
+              ))}
+            </Box>
+          )}
+        </Toolbar>
+      </AppBar>
       
-      <Header 
-        isAuthenticated={isAuthenticated} 
-        setIsAuthenticated={setIsAuthenticated}
-        showNotification={showNotification}
-      />
-      
-      {/* Main content area with id for skip link */}
-      <Box 
-        component="main" 
-        id="main-content" 
-        sx={{ 
-          flexGrow: 1, 
-          py: 3,
-          px: { xs: 2, sm: 3, md: 4 },
-          position: 'relative',
-          zIndex: 1
-        }} 
+      <Drawer
+        anchor="left"
+        open={drawerOpen}
+        onClose={toggleDrawer}
       >
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<Home showNotification={showNotification} />} />
-            <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} showNotification={showNotification} />} />
-            <Route path="/register" element={<Register setIsAuthenticated={setIsAuthenticated} showNotification={showNotification} />} />
-            <Route path="/components" element={<ComponentDemo />} />
-            
-            {/* Protected routes */}
-            <Route 
-              path="/dashboard" 
-              element={<ProtectedRoute><Dashboard showNotification={showNotification} /></ProtectedRoute>} 
-            />
-            <Route 
-              path="/analysis/:measurementId" 
-              element={<ProtectedRoute><Analysis showNotification={showNotification} /></ProtectedRoute>} 
-            />
-            <Route 
-              path="/shop" 
-              element={<ProtectedRoute><Shop showNotification={showNotification} /></ProtectedRoute>} 
-            />
-            <Route 
-              path="/products/:productId" 
-              element={<ProtectedRoute><ProductDetail showNotification={showNotification} /></ProtectedRoute>} 
-            />
-            <Route 
-              path="/profile" 
-              element={<ProtectedRoute><Profile showNotification={showNotification} /></ProtectedRoute>} 
-            />
-            {/* New Face Scanner route */}
-            <Route 
-              path="/face-scanner" 
-              element={<ProtectedRoute><FaceScannerPage showNotification={showNotification} /></ProtectedRoute>} 
-            />
-            {/* AI Training route */}
-            <Route 
-              path="/training" 
-              element={<ProtectedRoute><Training showNotification={showNotification} /></ProtectedRoute>} 
-            />
-            
-            {/* Catch-all route */}
-            <Route path="*" element={<NotFound showNotification={showNotification} />} />
-          </Routes>
-        </Suspense>
+        {drawer}
+      </Drawer>
+      
+      <Box component="main" sx={{ flexGrow: 1, py: 3, px: { xs: 2, sm: 3 } }}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/eyewear" element={<Dashboard />} />
+          <Route path="/cart" element={<Dashboard />} />
+          <Route path="/settings" element={<Dashboard />} />
+          <Route path="/tester" element={<ComponentTester />} />
+        </Routes>
       </Box>
       
-      <Footer />
+      <Box component="footer" sx={{ py: 3, textAlign: 'center', borderTop: 1, borderColor: 'divider' }}>
+        <Typography variant="body2" color="text.secondary">
+          © {new Date().getFullYear()} VisionAI - Advanced Eyewear Technology
+        </Typography>
+      </Box>
 
       {/* Global notification system */}
       <Snackbar 
@@ -222,7 +282,7 @@ function App() {
           {notification.message}
         </Alert>
       </Snackbar>
-    </div>
+    </Box>
   );
 }
 

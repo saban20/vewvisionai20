@@ -11,8 +11,7 @@ import { Button, Dialog, DialogTitle, DialogContent, DialogActions, Typography, 
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import WifiIcon from '@mui/icons-material/Wifi';
 import WifiOffIcon from '@mui/icons-material/WifiOff';
-import AIEyewearEngine from '../utils/AIEyewearEngine';
-import FaceCalibration from './FaceCalibration';
+import AIEyewearEngine from './utils/AIEyewearEngine';
 
 // Import TensorFlow.js and preload the AI models
 import * as tf from '@tensorflow/tfjs';
@@ -112,6 +111,11 @@ const AccessibilityProvider = ({ children }) => {
     return localStorage.getItem('colorFilters') || 'none';
   });
 
+  // Add state for theme mode
+  const [themeMode, setThemeMode] = useState(() => {
+    return localStorage.getItem('themeMode') || 'light';
+  });
+
   // AI state
   const [aiStatus, setAiStatus] = useState({
     initialized: false,
@@ -144,30 +148,36 @@ const AccessibilityProvider = ({ children }) => {
     localStorage.setItem('keyboardShortcuts', keyboardShortcuts);
     localStorage.setItem('textSpacing', textSpacing);
     localStorage.setItem('colorFilters', colorFilters);
-  }, [voiceAssist, reduceMotion, highContrast, largeText, lineSpacing, focusIndicator, keyboardShortcuts, textSpacing, colorFilters]);
+    localStorage.setItem('themeMode', themeMode);
+  }, [voiceAssist, reduceMotion, highContrast, largeText, lineSpacing, focusIndicator, keyboardShortcuts, textSpacing, colorFilters, themeMode]);
+
+  // Function to toggle theme mode
+  const toggleThemeMode = () => {
+    setThemeMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
+  };
 
   // Create theme with light/dark mode and accessibility preferences
   const theme = useMemo(() => {
     const baseTheme = createTheme({
       palette: {
-        mode: 'light',
+        mode: themeMode, // Use themeMode from state
         ...(highContrast
           ? {
-              // Light mode colors
+              // High contrast colors
               primary: {
-                main: '#0050A0',
+                main: themeMode === 'light' ? '#0050A0' : '#60A0FF',
               },
               secondary: {
-                main: '#D03060',
+                main: themeMode === 'light' ? '#D03060' : '#FF6090',
               },
             }
           : {
-              // Dark mode colors
+              // Regular colors
               primary: {
-                main: '#60A0FF',
+                main: themeMode === 'light' ? '#2979FF' : '#90CAF9',
               },
               secondary: {
-                main: '#FF6090',
+                main: themeMode === 'light' ? '#F50057' : '#FF80AB',
               },
             }),
       },
@@ -225,7 +235,7 @@ const AccessibilityProvider = ({ children }) => {
     });
 
     return baseTheme;
-  }, [highContrast, largeText, lineSpacing, focusIndicator]);
+  }, [themeMode, highContrast, largeText, lineSpacing, focusIndicator]);
 
   const contextValue = {
     voiceAssist,
@@ -249,19 +259,21 @@ const AccessibilityProvider = ({ children }) => {
   };
 
   return (
-    <AccessibilityContext.Provider value={contextValue}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <AIContext.Provider value={{
-          status: aiStatus,
-          setStatus: setAiStatus
-        }}>
-          <SocketProvider>
-            {children}
-          </SocketProvider>
-        </AIContext.Provider>
-      </ThemeProvider>
-    </AccessibilityContext.Provider>
+    <ThemeContext.Provider value={{ themeMode, setThemeMode: toggleThemeMode }}>
+      <AccessibilityContext.Provider value={contextValue}>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <AIContext.Provider value={{
+            status: aiStatus,
+            setStatus: setAiStatus
+          }}>
+            <SocketProvider>
+              {children}
+            </SocketProvider>
+          </AIContext.Provider>
+        </ThemeProvider>
+      </AccessibilityContext.Provider>
+    </ThemeContext.Provider>
   );
 };
 
@@ -823,9 +835,7 @@ root.render(
   <React.StrictMode>
     <BrowserRouter>
       <AccessibilityProvider>
-        <SocketProvider>
-          <App />
-        </SocketProvider>
+        <App />
       </AccessibilityProvider>
     </BrowserRouter>
   </React.StrictMode>
@@ -847,333 +857,4 @@ if ('serviceWorker' in navigator) {
         console.error('ServiceWorker registration failed:', error);
       });
   });
-} 
-
-async function loadResonanceModelAsync() {
-  try {
-    // Track loading progress for UI feedback
-    let loadProgress = 0;
-    if (onProgressUpdate) {
-      onProgressUpdate({ stage: 'model_init', progress: loadProgress });
-    }
-    
-    // Model version - increment when architecture changes
-    const MODEL_VERSION = '1.0.0';
-    const MODEL_KEY = 'indexeddb://qifr-model-v' + MODEL_VERSION;
-    
-    // Check if we have a saved model of the correct version
-    const savedModels = await tf.io.listModels();
-    
-    if (savedModels[MODEL_KEY]) {
-      // Load existing model with progress tracking
-      resonanceModel = await tf.loadLayersModel(MODEL_KEY, {
-        onProgress: (fraction) => {
-          loadProgress = Math.floor(fraction * 100);
-          if (onProgressUpdate) {
-            onProgressUpdate({ 
-              stage: 'model_loading', 
-              progress: loadProgress 
-            });
-          }
-        }
-      });
-      console.log(`QIFR Model v${MODEL_VERSION} loaded from IndexedDB`);
-    } else {
-      // Create new model
-      console.log(`Creating new QIFR Model v${MODEL_VERSION}`);
-      if (onProgressUpdate) {
-        onProgressUpdate({ stage: 'model_creating', progress: 30 });
-      }
-      
-      resonanceModel = tf.sequential();
-      resonanceModel.add(tf.layers.dense({ 
-        units: 128, 
-        inputShape: [474], 
-        activation: 'relu',
-        kernelRegularizer: tf.regularizers.l2(0.001)
-      }));
-      resonanceModel.add(tf.layers.dropout({ rate: 0.25 }));
-      resonanceModel.add(tf.layers.dense({ 
-        units: 64, 
-        activation: 'relu' 
-      }));
-      resonanceModel.add(tf.layers.dense({ 
-        units: 8, 
-        activation: 'sigmoid' 
-      }));
-      
-      resonanceModel.compile({ 
-        optimizer: 'adam', 
-        loss: 'meanSquaredError',
-        metrics: ['accuracy']
-      });
-      
-      if (onProgressUpdate) {
-        onProgressUpdate({ stage: 'model_saving', progress: 70 });
-      }
-      
-      // Save model for offline use
-      try {
-        await resonanceModel.save(MODEL_KEY);
-        console.log(`QIFR Model v${MODEL_VERSION} saved to IndexedDB`);
-      } catch (saveError) {
-        // Log error but continue - model will still work for this session
-        console.warn('Could not save model to IndexedDB:', saveError);
-      }
-    }
-    
-    // Clean up old model versions
-    const modelKeys = Object.keys(savedModels);
-    const oldVersions = modelKeys.filter(key => 
-      key.startsWith('indexeddb://qifr-model-v') && 
-      key !== MODEL_KEY
-    );
-    
-    if (oldVersions.length > 0) {
-      console.log('Cleaning up old model versions');
-      for (const oldKey of oldVersions) {
-        try {
-          await tf.io.removeModel(oldKey);
-        } catch (e) {
-          console.warn(`Failed to remove old model ${oldKey}:`, e);
-        }
-      }
-    }
-    
-    isModelLoaded = true;
-    
-    if (onProgressUpdate) {
-      onProgressUpdate({ stage: 'model_ready', progress: 100 });
-    }
-    
-    // Warm up the model with a dummy prediction
-    warmUpModel();
-    
-    return true;
-  } catch (error) {
-    console.error('Error loading QIFR model:', error);
-    
-    // Attempt to create a simpler fallback model
-    try {
-      console.warn('Creating simplified fallback model');
-      resonanceModel = tf.sequential();
-      resonanceModel.add(tf.layers.dense({ units: 32, inputShape: [474], activation: 'relu' }));
-      resonanceModel.add(tf.layers.dense({ units: 8, activation: 'sigmoid' }));
-      resonanceModel.compile({ optimizer: 'sgd', loss: 'meanSquaredError' });
-      isModelLoaded = true;
-      
-      if (onProgressUpdate) {
-        onProgressUpdate({ stage: 'fallback_ready', progress: 100 });
-      }
-      
-      return true;
-    } catch (fallbackError) {
-      console.error('Even fallback model creation failed:', fallbackError);
-      isModelLoaded = false;
-      
-      if (onProgressUpdate) {
-        onProgressUpdate({ stage: 'model_failed', progress: 0, error: error.message });
-      }
-      
-      return false;
-    }
-  }
-}
-
-// Pre-warm the model to avoid first inference delay
-function warmUpModel() {
-  try {
-    const dummyInput = tf.zeros([1, 474]);
-    const warmupResult = resonanceModel.predict(dummyInput);
-    warmupResult.dataSync(); // Force execution
-    tf.dispose([dummyInput, warmupResult]); // Clean up
-    console.log('Model warmed up');
-  } catch (e) {
-    console.warn('Model warmup failed:', e);
-  }
-}
-
-calculateDynamicMetrics() {
-  // ... existing code ...
-  
-  // More nuanced emotion model using multiple dimensions
-  const emotions = {
-    joy: Math.min(1, this.results.dynamics.smileIntensity * 1.5),
-    calmness: Math.min(1, 1 - (this.results.dynamics.blinkRate * 2 + this.results.dynamics.movementEnergy)),
-    energy: Math.min(1, this.results.dynamics.movementEnergy * 1.2 + this.results.dynamics.headTilt / 45),
-    focus: Math.min(1, 1 - this.results.dynamics.headTilt / 30)
-  };
-  
-  // Calculate overall emotion score with weighted contribution
-  this.results.dynamics.emotions = emotions;
-  this.results.dynamics.emotionScore = Math.min(1, 
-    emotions.joy * 0.3 + 
-    emotions.calmness * 0.25 + 
-    emotions.energy * 0.25 + 
-    emotions.focus * 0.2
-  );
-  
-  // Apply temporal smoothing to prevent jitter
-  if (this.previousEmotionScore) {
-    this.results.dynamics.emotionScore = 
-      this.results.dynamics.emotionScore * 0.3 + 
-      this.previousEmotionScore * 0.7;
-  }
-  this.previousEmotionScore = this.results.dynamics.emotionScore;
-}
-
-computeVisualAuraAndShape() {
-  const landmarks = this.frameBuffer[this.frameBuffer.length - 1];
-  
-  // Create a richer input with emotional dimensions
-  const input = [
-    ...landmarks.map(p => [p.x, p.y, p.z || 0]).flat(),
-    this.results.dynamics.blinkRate,
-    this.results.dynamics.smileIntensity,
-    this.results.dynamics.headTilt,
-    this.results.dynamics.movementEnergy,
-    this.results.dynamics.emotionScore,
-    this.results.dynamics.emotions.joy,
-    this.results.dynamics.emotions.calmness,
-    this.results.dynamics.emotions.energy,
-    this.results.dynamics.emotions.focus
-  ];
-  // ... rest of the method ...
-}
-
-recommendFramesWithResonance() {
-  const aura = this.results.visualAura;
-  const shapeProbs = Object.values(this.results.faceShape);
-  const emotions = this.results.dynamics.emotions;
-  
-  // Enhanced resonance calculation with emotional mapping
-  const resonanceScore = (frame) => {
-    // Base physical measurements (fit)
-    const fitDiff = Math.abs(frame.pd - this.results.measurements.pd) +
-                   Math.abs(frame.bridge - this.results.measurements.bridgeHeight) +
-                   Math.abs(frame.lensHeight - this.results.measurements.lensHeight);
-    const fitScore = 1 / (1 + fitDiff / 50);
-    
-    // Style match based on shape
-    const shapeMatch = Math.max(...shapeProbs) * (frame.style === this.getDominantShape() ? 1 : 0.5);
-    
-    // Aura resonance with emotion-specific weighting
-    const auraDiff = frame.aura.reduce((sum, val, i) => {
-      // Weight different aura components based on emotional state
-      const weights = [
-        emotions.energy * 1.2,    // Energy component weight
-        emotions.calmness * 1.2,  // Calm component weight
-        1.0                       // Base weight for vibrancy
-      ];
-      return sum + Math.abs(val - aura[i]) * weights[i];
-    }, 0);
-    const auraScore = 1 / (1 + auraDiff);
-    
-    // Emotional resonance bonus - different frame styles resonate differently with emotions
-    const styleEmotionMap = {
-      'futuristic': emotions.energy * 0.5 + emotions.joy * 0.3,
-      'elegant': emotions.calmness * 0.5 + emotions.focus * 0.3,
-      'sporty': emotions.energy * 0.6 + emotions.joy * 0.2,
-      'classic': emotions.calmness * 0.4 + emotions.focus * 0.4,
-      'minimalist': emotions.focus * 0.5 + emotions.calmness * 0.3
-    };
-    
-    const emotionalBonus = styleEmotionMap[frame.style] || 0.3;
-    
-    // Combine all factors with appropriate weights
-    return (fitScore * 0.4) + (shapeMatch * 0.25) + (auraScore * 0.25) + (emotionalBonus * 0.1);
-  };
-
-  this.results.recommendations = this.frameDatabase
-    .map(frame => ({ 
-      ...frame, 
-      resonance: resonanceScore(frame),
-      emotionalFit: this.calculateEmotionalFitDescription(frame)
-    }))
-    .sort((a, b) => b.resonance - a.resonance)
-    .slice(0, 3);
-}
-
-// New method to generate emotional fit descriptions
-calculateEmotionalFitDescription(frame) {
-  const emotions = this.results.dynamics.emotions;
-  const dominantEmotion = Object.entries(emotions)
-    .sort((a, b) => b[1] - a[1])[0];
-  
-  const emotionDescriptions = {
-    joy: {
-      futuristic: "enhances your expressive energy",
-      elegant: "balances your joy with sophistication",
-      sporty: "complements your vibrant personality",
-      classic: "adds timeless appeal to your positive expression",
-      minimalist: "refines your cheerful appearance"
-    },
-    calmness: {
-      futuristic: "adds an exciting edge to your composed demeanor",
-      elegant: "perfectly harmonizes with your tranquil presence",
-      sporty: "energizes your peaceful aura",
-      classic: "complements your composed nature",
-      minimalist: "enhances your serene expression"
-    },
-    energy: {
-      futuristic: "amplifies your dynamic spirit",
-      elegant: "brings refinement to your energetic presence",
-      sporty: "perfectly matches your active vibe",
-      classic: "grounds your energetic appearance",
-      minimalist: "streamlines your vibrant expression"
-    },
-    focus: {
-      futuristic: "transforms your concentrated look",
-      elegant: "enhances your attentive presence",
-      sporty: "adds a dynamic touch to your focused demeanor",
-      classic: "reinforces your determined expression",
-      minimalist: "perfectly complements your precise nature"
-    }
-  };
-  
-  return emotionDescriptions[dominantEmotion[0]][frame.style] || 
-         "resonates with your current expression";
-}
-
-renderCanvas() {
-  const ctx = this.canvas.getContext('2d');
-  ctx.clearRect(0, 0, 640, 480);
-  
-  if (this.results.visualAura) {
-    const [energy, calm, vibrancy] = this.results.visualAura;
-    const emotionScore = this.results.dynamics.emotionScore;
-    const emotions = this.results.dynamics.emotions;
-    
-    // Create pulsating effect based on emotion
-    const pulseSize = 1 + (Math.sin(Date.now() / 1000) * 0.05 * emotionScore);
-    const baseOpacity = 0.2 + emotionScore * 0.3;
-    
-    // Draw multiple layers with different opacity for depth effect
-    for (let i = 3; i > 0; i--) {
-      const layerSize = 200 * pulseSize * (1 + (i * 0.1));
-      const layerOpacity = baseOpacity / (i * 1.5);
-      
-      ctx.fillStyle = `rgba(${energy * 255}, ${calm * 255}, ${vibrancy * 255}, ${layerOpacity})`;
-      ctx.beginPath();
-      ctx.arc(320, 240, layerSize, 0, 2 * Math.PI);
-      ctx.fill();
-    }
-    
-    // Draw main aura
-    ctx.fillStyle = `rgba(${energy * 255}, ${calm * 255}, ${vibrancy * 255}, ${baseOpacity})`;
-    ctx.beginPath();
-    ctx.arc(320, 240, 200 * pulseSize, 0, 2 * Math.PI);
-    ctx.fill();
-    
-    // Display metrics with improved formatting
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '18px Rajdhani';
-    ctx.fillText(`Aura: E:${energy.toFixed(2)}, C:${calm.toFixed(2)}, V:${vibrancy.toFixed(2)}`, 10, 30);
-    
-    // Display emotional state
-    const dominantEmotion = Object.entries(emotions)
-      .sort((a, b) => b[1] - a[1])[0];
-    ctx.fillStyle = '#F0F0FF';
-    ctx.fillText(`Emotion: ${dominantEmotion[0].charAt(0).toUpperCase() + dominantEmotion[0].slice(1)} (${(dominantEmotion[1] * 100).toFixed(0)}%)`, 10, 58);
-  }
 } 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -27,6 +27,10 @@ import {
   FormControlLabel,
   FormControl,
   FormLabel,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   CheckCircle as CheckIcon,
@@ -41,7 +45,14 @@ import {
   ColorLens as ColorIcon,
   ScatterPlot as MaterialIcon,
   Info as InfoIcon,
+  ViewInAr as TryOnIcon,
+  Close as CloseIcon,
+  CameraAlt as CameraIcon,
+  PhotoLibrary as GalleryIcon,
 } from '@mui/icons-material';
+import Webcam from 'react-webcam';
+import aiService from '../utils/aiService';
+import { theme } from '../theme';
 
 // Mock product data
 const MOCK_PRODUCTS = {
@@ -125,6 +136,17 @@ const ProductDetail = ({ showNotification }) => {
   const [quantity, setQuantity] = useState(1);
   const [tabValue, setTabValue] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
+  
+  // Virtual try-on states
+  const [tryOnDialogOpen, setTryOnDialogOpen] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [tryOnImage, setTryOnImage] = useState(null);
+  const [tryOnResult, setTryOnResult] = useState(null);
+  const [tryOnLoading, setTryOnLoading] = useState(false);
+  const [tryOnError, setTryOnError] = useState(null);
+  const webcamRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const cancelTokenRef = useRef(null);
 
   // Fetch product data
   useEffect(() => {
@@ -182,6 +204,144 @@ const ProductDetail = ({ showNotification }) => {
 
   const handleImageSelect = (index) => {
     setSelectedImage(index);
+  };
+
+  // Virtual try-on functions
+  const handleTryOnOpen = () => {
+    setTryOnDialogOpen(true);
+    setTryOnImage(null);
+    setTryOnResult(null);
+    setTryOnError(null);
+    setIsCameraActive(false);
+  };
+
+  const handleTryOnClose = () => {
+    // Clean up properly when dialog closes
+    setTryOnDialogOpen(false);
+    setTryOnImage(null);
+    setTryOnResult(null);
+    setIsCameraActive(false);
+    
+    // Cancel any pending requests
+    if (cancelTokenRef.current) {
+      cancelTokenRef.current.cancel();
+    }
+    
+    // Allow time for animation to complete before removing error
+    setTimeout(() => {
+      setTryOnError(null);
+    }, 300);
+  };
+
+  // Add useEffect to clean up when component unmounts
+  useEffect(() => {
+    return () => {
+      // Clean up any resources when component unmounts
+      setTryOnImage(null);
+      setTryOnResult(null);
+      
+      // Ensure webcam is turned off when component unmounts
+      if (isCameraActive) {
+        setIsCameraActive(false);
+      }
+      
+      // Cancel any pending requests when component unmounts
+      if (cancelTokenRef.current) {
+        cancelTokenRef.current.cancel();
+      }
+    };
+  }, [isCameraActive]);
+
+  const handleCaptureFromWebcam = async () => {
+    if (webcamRef.current) {
+      try {
+        // Cancel any previous request
+        if (cancelTokenRef.current) {
+          cancelTokenRef.current.cancel();
+        }
+        
+        // Create a new cancelable request
+        cancelTokenRef.current = aiService.createCancelableRequest();
+        
+        const imageSrc = webcamRef.current.getScreenshot();
+        if (!imageSrc) throw new Error('Failed to capture image from webcam');
+        
+        setTryOnImage(imageSrc);
+        setTryOnLoading(true);
+        setTryOnError(null);
+        
+        // Process virtual try-on through backend AI service
+        const base64Image = imageSrc.split(',')[1];
+        const result = await aiService.virtualTryOn(
+          base64Image, 
+          parseInt(productId),
+          { cancelToken: cancelTokenRef.current.cancelToken }
+        );
+        
+        // Check if request was canceled
+        if (result && result.canceled) {
+          return;
+        }
+        
+        setTryOnResult(result.image_url);
+        setIsCameraActive(false);
+      } catch (err) {
+        console.error('Error with virtual try-on:', err);
+        setTryOnError('Failed to process try-on: ' + (err.message || 'Unknown error'));
+      } finally {
+        setTryOnLoading(false);
+      }
+    }
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      try {
+        // Cancel any previous request
+        if (cancelTokenRef.current) {
+          cancelTokenRef.current.cancel();
+        }
+        
+        // Create a new cancelable request
+        cancelTokenRef.current = aiService.createCancelableRequest();
+        
+        setTryOnLoading(true);
+        setTryOnError(null);
+        
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const imageSrc = e.target.result;
+          setTryOnImage(imageSrc);
+          
+          // Process virtual try-on through backend AI service
+          const base64Image = imageSrc.split(',')[1];
+          const result = await aiService.virtualTryOn(
+            base64Image, 
+            parseInt(productId),
+            { cancelToken: cancelTokenRef.current.cancelToken }
+          );
+          
+          // Check if request was canceled
+          if (result && result.canceled) {
+            setTryOnLoading(false);
+            return;
+          }
+          
+          setTryOnResult(result.image_url);
+          setTryOnLoading(false);
+        };
+        reader.onerror = () => {
+          setTryOnError('Failed to read the image file. Please try another file.');
+          setTryOnLoading(false);
+        };
+        reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Error with virtual try-on:', err);
+        setTryOnError('Failed to process try-on: ' + (err.message || 'Unknown error'));
+        setTryOnLoading(false);
+      }
+    }
   };
 
   if (loading) {
@@ -374,31 +534,50 @@ const ProductDetail = ({ showNotification }) => {
               </Box>
             </Box>
 
-            <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-              <Button 
-                variant="contained" 
-                color="primary"
-                size="large"
-                fullWidth
-                startIcon={<CartIcon />}
-                onClick={handleAddToCart}
-                disabled={!product.inStock}
-              >
-                {product.inStock ? 'Add to Cart' : 'Out of Stock'}
-              </Button>
-              <IconButton 
-                color="error"
-                onClick={toggleFavorite}
-                sx={{ border: '1px solid', borderColor: 'grey.300' }}
-              >
-                {isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
-              </IconButton>
-              <IconButton 
-                onClick={handleShare}
-                sx={{ border: '1px solid', borderColor: 'grey.300' }}
-              >
-                <ShareIcon />
-              </IconButton>
+            <Box sx={{ mb: 3 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={8}>
+                  <Button 
+                    variant="contained" 
+                    color="primary"
+                    size="large"
+                    fullWidth
+                    startIcon={<CartIcon />}
+                    onClick={handleAddToCart}
+                    disabled={!product.inStock}
+                  >
+                    {product.inStock ? 'Add to Cart' : 'Out of Stock'}
+                  </Button>
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    size="large"
+                    fullWidth
+                    startIcon={<TryOnIcon />}
+                    onClick={handleTryOnOpen}
+                  >
+                    Virtual Try-On
+                  </Button>
+                </Grid>
+              </Grid>
+              
+              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 2 }}>
+                <IconButton 
+                  color="error"
+                  onClick={toggleFavorite}
+                  sx={{ border: '1px solid', borderColor: 'grey.300' }}
+                >
+                  {isFavorite ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+                </IconButton>
+                <IconButton 
+                  onClick={handleShare}
+                  sx={{ border: '1px solid', borderColor: 'grey.300' }}
+                >
+                  <ShareIcon />
+                </IconButton>
+              </Box>
             </Box>
 
             {/* Compatibility Info */}
@@ -540,6 +719,149 @@ const ProductDetail = ({ showNotification }) => {
           </Grid>
         </Grid>
       </Box>
+
+      {/* Virtual Try-On Dialog */}
+      <Dialog 
+        open={tryOnDialogOpen} 
+        onClose={handleTryOnClose}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">Virtual Try-On: {product?.name}</Typography>
+          <IconButton onClick={handleTryOnClose} edge="end">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" gutterBottom sx={{ mb: 3 }}>
+            Take a selfie or upload a photo to see how these frames look on you!
+          </Typography>
+          
+          {tryOnError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {tryOnError}
+            </Alert>
+          )}
+          
+          {!tryOnResult && !tryOnImage && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mb: 3 }}>
+              <Button
+                variant="contained"
+                startIcon={<CameraIcon />}
+                onClick={() => setIsCameraActive(!isCameraActive)}
+                disabled={tryOnLoading}
+              >
+                {isCameraActive ? 'Hide Camera' : 'Use Camera'}
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<GalleryIcon />}
+                onClick={() => fileInputRef.current.click()}
+                disabled={tryOnLoading}
+              >
+                Upload Photo
+              </Button>
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+              />
+            </Box>
+          )}
+          
+          {isCameraActive && !tryOnResult && (
+            <Box sx={{ position: 'relative', mb: 3 }}>
+              <Webcam
+                audio={false}
+                ref={webcamRef}
+                screenshotFormat="image/jpeg"
+                width="100%"
+                height="auto"
+                style={{ borderRadius: theme.borderRadius.md }}
+              />
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleCaptureFromWebcam}
+                disabled={tryOnLoading}
+                sx={{ 
+                  position: 'absolute', 
+                  bottom: 10, 
+                  left: '50%', 
+                  transform: 'translateX(-50%)' 
+                }}
+              >
+                {tryOnLoading ? <CircularProgress size={24} /> : 'Capture'}
+              </Button>
+            </Box>
+          )}
+          
+          {tryOnImage && !tryOnResult && !tryOnLoading && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" gutterBottom>Your Photo:</Typography>
+              <Box 
+                component="img" 
+                src={tryOnImage}
+                alt="Your photo"
+                sx={{ 
+                  maxWidth: '100%', 
+                  maxHeight: '400px',
+                  display: 'block',
+                  margin: '0 auto',
+                  borderRadius: theme.borderRadius.md
+                }}
+              />
+            </Box>
+          )}
+          
+          {tryOnLoading && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
+              <CircularProgress size={48} />
+              <Typography variant="body1" sx={{ mt: 2 }}>
+                Processing your virtual try-on...
+              </Typography>
+            </Box>
+          )}
+          
+          {tryOnResult && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle1" gutterBottom>Virtual Try-On Result:</Typography>
+              <Box 
+                component="img" 
+                src={tryOnResult}
+                alt="Virtual try-on result"
+                sx={{ 
+                  maxWidth: '100%', 
+                  maxHeight: '500px',
+                  display: 'block',
+                  margin: '0 auto',
+                  borderRadius: theme.borderRadius.md
+                }}
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          {tryOnResult && (
+            <Button 
+              onClick={() => {
+                setTryOnImage(null);
+                setTryOnResult(null);
+                setTryOnError(null);
+              }}
+              color="primary"
+            >
+              Try Another Photo
+            </Button>
+          )}
+          <Button onClick={handleTryOnClose} color="primary">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
